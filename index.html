@@ -105,7 +105,7 @@
         square.classList.add('square', isDark ? 'dark' : 'light');
 
         // 체스 초기 배치 구현
-        if (row >= 6) {  // 위쪽 3줄에만 기물 배치
+        if (row === 8 || row === 7 || row === 2 || row === 1) {  // 기물이 있는 줄만 처리
           const piece = document.createElement('div');
           piece.classList.add('piece');
           
@@ -124,8 +124,20 @@
             }
           } else if (row === 7) {  // 두 번째 줄 (흑 폰)
             piece.classList.add('black', 'pawn');
-          } else {
-
+          } else if (row === 2) {  // 일곱 번째 줄 (백 폰)
+            piece.classList.add('white', 'pawn');
+          } else if (row === 1) {  // 여덟 번째 줄 (백)
+            if (col === 1 || col === 8) {
+              piece.classList.add('white', 'rook');
+            } else if (col === 2 || col === 7) {
+              piece.classList.add('white', 'knight');
+            } else if (col === 3 || col === 6) {
+              piece.classList.add('white', 'bishop');
+            } else if (col === 4) {
+              piece.classList.add('white', 'queen');
+            } else if (col === 5) {
+              piece.classList.add('white', 'king');
+            }
           }
           
           if (piece.classList.contains('black') || piece.classList.contains('white')) {
@@ -193,11 +205,14 @@
           const startRank = isWhite ? 6 : 1;
 
           // 전진
-          if (!getPieceAt(currentRank + direction, currentFile)) {
-            moves.push([currentRank + direction, currentFile]);
-            // 첫 이동시 2칸 전진
-            if (currentRank === startRank && !getPieceAt(currentRank + 2 * direction, currentFile)) {
-              moves.push([currentRank + 2 * direction, currentFile]);
+          if (currentRank + direction >= 0 && currentRank + direction < 8) {
+            // 바로 앞칸이 비어있는 경우에만 전진 가능
+            if (!getPieceAt(currentRank + direction, currentFile)) {
+              moves.push([currentRank + direction, currentFile]);
+              // 첫 이동시 2칸 전진
+              if (currentRank === startRank && !getPieceAt(currentRank + 2 * direction, currentFile)) {
+                moves.push([currentRank + 2 * direction, currentFile]);
+              }
             }
           }
 
@@ -205,7 +220,7 @@
           for (const fileOffset of [-1, 1]) {
             const targetRank = currentRank + direction;
             const targetFile = currentFile + fileOffset;
-            if (targetFile >= 0 && targetFile < 8) {
+            if (targetRank >= 0 && targetRank < 8 && targetFile >= 0 && targetFile < 8) {
               const targetPiece = getPieceAt(targetRank, targetFile);
               if (targetPiece && targetPiece.classList.contains(isWhite ? 'black' : 'white')) {
                 moves.push([targetRank, targetFile]);
@@ -312,8 +327,30 @@
 
       if (selectedPiece) {
         // 기물이 이미 선택된 상태
-        if (target.classList.contains('piece')) {
-          // 다른 기물을 클릭한 경우
+        const targetPiece = targetSquare.querySelector('.piece');
+        const targetIndex = Array.from(board.children).indexOf(targetSquare);
+        const targetRank = Math.floor(targetIndex / 8);
+        const targetFile = targetIndex % 8;
+        
+        // 이동이 유효한지 확인
+        const isValidMove = validMoves.some(([rank, file]) => 
+          rank === targetRank && file === targetFile
+        );
+
+        if (isValidMove) {
+          // 이동하려는 칸에 상대방 기물이 있는지 확인
+          if (targetPiece && targetPiece !== selectedPiece) {
+            // 상대방 기물 제거 (잡기)
+            targetPiece.remove();
+          }
+          
+          targetSquare.appendChild(selectedPiece);
+          selectedPiece.classList.remove('selected');
+          document.querySelectorAll('.valid-move').forEach(el => el.remove());
+          selectedPiece = null;
+          validMoves = [];
+        } else if (target.classList.contains('piece')) {
+          // 다른 기물 클릭: 선택 변경
           if (target === selectedPiece) {
             // 같은 기물 클릭: 선택 해제
             selectedPiece.classList.remove('selected');
@@ -321,31 +358,13 @@
             selectedPiece = null;
             validMoves = [];
           } else {
-            // 다른 기물 클릭: 선택 변경
+            // 새로운 기물 선택
             selectedPiece.classList.remove('selected');
             document.querySelectorAll('.valid-move').forEach(el => el.remove());
             selectedPiece = target;
             selectedPiece.classList.add('selected');
             validMoves = calculateValidMoves(selectedPiece);
             showValidMoves(validMoves);
-          }
-        } else {
-          // 빈 칸 또는 점유된 칸 클릭: 기물 이동
-          const targetIndex = Array.from(board.children).indexOf(targetSquare);
-          const targetRank = Math.floor(targetIndex / 8);
-          const targetFile = targetIndex % 8;
-          
-          // 이동이 유효한지 확인
-          const isValidMove = validMoves.some(([rank, file]) => 
-            rank === targetRank && file === targetFile
-          );
-
-          if (isValidMove) {
-            targetSquare.appendChild(selectedPiece);
-            selectedPiece.classList.remove('selected');
-            document.querySelectorAll('.valid-move').forEach(el => el.remove());
-            selectedPiece = null;
-            validMoves = [];
           }
         }
       } else {
