@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Chess Board with Drag & Drop</title>
+  <title>Chess Board with Pointer Events</title>
   <style>
     /* ===== 전체 레이아웃 ===== */
     body {
@@ -15,7 +15,7 @@
     .chess-container {
       max-width: 800px; 
       width: 100%;
-      margin: 0 auto;  /* 중앙 정렬 */
+      margin: 0 auto;
       padding: 20px;
       box-sizing: border-box;
       background-color: #ffffff;
@@ -23,8 +23,8 @@
     }
     .board-wrapper {
       width: 100%;
-      max-width: 480px; /* 보드 크기 설정 */
-      margin: 0 auto;   /* 중앙 정렬 */
+      max-width: 480px;
+      margin: 0 auto;
     }
 
     /* ===== 체스 보드 (8x8) ===== */
@@ -33,41 +33,41 @@
       grid-template-columns: repeat(8, 1fr);
       grid-template-rows: repeat(8, 1fr);
       border: 2px solid #333;
-      aspect-ratio: 1 / 1;  /* 가로/세로 비율 1:1 */
+      aspect-ratio: 1 / 1; /* 가로/세로 비율 1:1 */
     }
-    /* 칸 */
     .square {
-      width: 100%;
-      height: 100%;
-      display: flex;       /* 내부 기물 중앙 배치를 위해 flex 사용 */
-      align-items: center; 
+      display: flex;
+      align-items: center;
       justify-content: center;
+      position: relative; /* 기물이 상대배치(absolute)로 들어올 수 있음 */
     }
     .dark {
-      background-color: #769656; 
+      background-color: #769656;
     }
     .light {
-      background-color: #eeeed2; 
+      background-color: #eeeed2;
     }
 
     /* ===== 기물 스타일 ===== */
     .piece {
       font-size: 24px;
-      cursor: grab; /* 드래그 가능 표시 */
-      user-select: none; /* 텍스트 선택 방지 */
+      user-select: none; 
+      position: relative; /* 기본은 relative */
+      z-index: 1;         /* 드래그 시 위에 표시 */
     }
-    /* 드래그 중 스타일 변경(선택)할 경우 */
-    .piece:active {
+    /* 드래그 중 상태를 표시할 수도 있음 */
+    .dragging {
+      opacity: 0.8;
       cursor: grabbing;
     }
   </style>
 </head>
 <body>
   <div class="chess-container">
-    <h1>체스 보드 테스트 (Drag & Drop)</h1>
+    <h1>체스 보드 테스트 (Pointer Events)</h1>
     <div class="board-wrapper">
       <div id="chessBoard" class="chess-board">
-        <!-- JS로 64칸 생성 + 각 칸에 Pawn 하나씩 배치 -->
+        <!-- JS로 8x8 칸 생성 + 각 칸에 Pawn 하나씩 배치 -->
       </div>
     </div>
   </div>
@@ -75,49 +75,117 @@
   <script>
     const board = document.getElementById('chessBoard');
 
-    // 1) 8x8 칸 생성
+    // 1) 8x8 칸 생성 + 각 칸에 폰(♙) 하나씩 배치
     for (let row = 8; row >= 1; row--) {
       for (let col = 1; col <= 8; col++) {
         const square = document.createElement('div');
         const isDark = (row + col) % 2 === 0;
         square.classList.add('square', isDark ? 'dark' : 'light');
 
-        // 임의로 모든 칸에 '♙'(폰) 기물 하나씩 추가
+        // 테스트용으로 모든 칸에 기물 하나씩
         const piece = document.createElement('div');
         piece.classList.add('piece');
-        piece.setAttribute('draggable', 'true'); 
-        piece.textContent = '♙'; 
-        square.appendChild(piece);
+        piece.textContent = '♙';
 
+        square.appendChild(piece);
         board.appendChild(square);
       }
     }
 
-    let draggedPiece = null;  // 드래그 중인 기물 객체
+    let draggedPiece = null;    // 현재 드래그 중인 기물
+    let offsetX = 0, offsetY = 0; // 마우스/터치가 기물에서 떨어진 거리
+    let originalParent = null;  // 원래 기물이 있던 부모(칸)
+    let originalStyle = {       // 드래그 시작 전 기물의 원래 스타일
+      position: '',
+      left: '',
+      top: '',
+      transform: ''
+    };
 
-    // 2) 드래그 시작: dragstart
-    document.addEventListener('dragstart', (e) => {
-      // 기물을 드래그할 때
-      if (e.target.classList.contains('piece')) {
-        draggedPiece = e.target;
+    // 체스 보드 전체에 이벤트 위임
+    board.addEventListener('pointerdown', onPointerDown);
+
+    function onPointerDown(e) {
+      const target = e.target;
+      if (!target.classList.contains('piece')) return; // 기물이 아니면 무시
+
+      draggedPiece = target;
+      originalParent = target.parentElement;
+
+      // 원래 스타일 저장
+      originalStyle = {
+        position: target.style.position,
+        left: target.style.left,
+        top: target.style.top,
+        transform: target.style.transform
+      };
+
+      // pointer 이벤트 캡처 시작
+      draggedPiece.setPointerCapture(e.pointerId);
+
+      // 드래그 중 시각효과
+      draggedPiece.classList.add('dragging');
+
+      // 절대 위치로 전환
+      draggedPiece.style.position = 'absolute';
+
+      // 기물의 현재 좌표(브라우저 전체 기준) 구하기
+      const rect = target.getBoundingClientRect();
+      // 포인터(마우스/터치)에서 기물 왼쪽, 위쪽까지 거리
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+
+      // 기물이 원래 있던 자리(부모)에서 떼어내고 body에 붙여서 자유롭게 이동
+      document.body.appendChild(draggedPiece);
+
+      // 첫 위치를 맞춘다
+      draggedPiece.style.left = (e.clientX - offsetX) + 'px';
+      draggedPiece.style.top = (e.clientY - offsetY) + 'px';
+
+      // pointermove, pointerup 이벤트 바인딩
+      draggedPiece.addEventListener('pointermove', onPointerMove);
+      draggedPiece.addEventListener('pointerup', onPointerUp);
+    }
+
+    function onPointerMove(e) {
+      if (!draggedPiece) return;
+      // 기물 위치 갱신
+      draggedPiece.style.left = (e.clientX - offsetX) + 'px';
+      draggedPiece.style.top = (e.clientY - offsetY) + 'px';
+    }
+
+    function onPointerUp(e) {
+      if (!draggedPiece) return;
+
+      // pointer 이벤트 해제
+      draggedPiece.releasePointerCapture(e.pointerId);
+      draggedPiece.removeEventListener('pointermove', onPointerMove);
+      draggedPiece.removeEventListener('pointerup', onPointerUp);
+
+      // 드래그 종료 시, 포인터 아래 요소가 체스 칸(.square)인지 판단
+      const dropTarget = document.elementFromPoint(e.clientX, e.clientY);
+      if (dropTarget && dropTarget.classList.contains('square')) {
+        // 체스 칸이면, 그 칸에 기물을 추가
+        dropTarget.appendChild(draggedPiece);
+        // 기물 위치를 상대배치로 되돌린다
+        resetPieceStyle(draggedPiece);
+      } else {
+        // 체스 칸이 아니면, 원래 부모로 되돌린다
+        originalParent.appendChild(draggedPiece);
+        resetPieceStyle(draggedPiece);
       }
-    });
 
-    // 3) 드래그 중(칸 위로 이동): dragover
-    document.addEventListener('dragover', (e) => {
-      // drop 가능하게 하려면 반드시 preventDefault() 필요
-      e.preventDefault();
-    });
-
-    // 4) 드롭: drop
-    document.addEventListener('drop', (e) => {
-      e.preventDefault();
-      // 드롭 위치가 '.square'이고, 드래그 중인 기물이 있으면
-      if (draggedPiece && e.target.classList.contains('square')) {
-        e.target.appendChild(draggedPiece);
-      }
+      draggedPiece.classList.remove('dragging');
       draggedPiece = null;
-    });
+    }
+
+    function resetPieceStyle(piece) {
+      // 절대 위치에서 다시 relative 상태로 복귀
+      piece.style.position = originalStyle.position;
+      piece.style.left = originalStyle.left;
+      piece.style.top = originalStyle.top;
+      piece.style.transform = originalStyle.transform;
+    }
   </script>
 </body>
 </html>
