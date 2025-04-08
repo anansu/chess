@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chess Board with Drag & Drop</title>
+  <style>
+    /* ===== 전체 레이아웃 ===== */
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #fafafa;
+      font-family: Arial, sans-serif;
+    }
+    .chess-container {
+      max-width: 800px; 
+      width: 100%;
+      margin: 0 auto;  /* 중앙 정렬 */
+      padding: 20px;
+      box-sizing: border-box;
+      background-color: #ffffff;
+      min-height: 100vh;
+    }
+    .board-wrapper {
+      width: 100%;
+      max-width: 480px; /* 보드 크기 설정 */
+      margin: 0 auto;   /* 중앙 정렬 */
+    }
+
+    /* ===== 체스 보드 (8x8) ===== */
+    .chess-board {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      border: 2px solid #333;
+      aspect-ratio: 1 / 1;  /* 가로/세로 비율 1:1 */
+    }
+    /* 칸 */
+    .square {
+      width: 100%;
+      height: 100%;
+      display: flex;       /* 내부 기물 중앙 배치를 위해 flex 사용 */
+      align-items: center; 
+      justify-content: center;
+    }
+    .dark {
+      background-color: #769656; 
+    }
+    .light {
+      background-color: #eeeed2; 
+    }
+
+    /* ===== 기물 스타일 ===== */
+    .piece {
+      font-size: 24px;
+      cursor: grab; /* 드래그 가능 표시 */
+      user-select: none; /* 텍스트 선택 방지 */
+    }
+    /* 드래그 중 스타일 변경(선택)할 경우 */
+    .piece:active {
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body>
+  <div class="chess-container">
+    <h1>체스 보드 테스트 (Drag & Drop)</h1>
+    <div class="board-wrapper">
+      <div id="chessBoard" class="chess-board">
+        <!-- JS로 64칸 생성 + 각 칸에 Pawn 하나씩 배치 -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const board = document.getElementById('chessBoard');
+
+    // 1) 8x8 칸 생성
+    for (let row = 8; row >= 1; row--) {
+      for (let col = 1; col <= 8; col++) {
+        const square = document.createElement('div');
+        const isDark = (row + col) % 2 === 0;
+        square.classList.add('square', isDark ? 'dark' : 'light');
+
+        // 임의로 모든 칸에 '♙'(폰) 기물 하나씩 추가
+        const piece = document.createElement('div');
+        piece.classList.add('piece');
+        piece.setAttribute('draggable', 'true'); 
+        piece.textContent = '♙'; 
+        square.appendChild(piece);
+
+        board.appendChild(square);
+      }
+    }
+
+    let draggedPiece = null;  // 드래그 중인 기물 객체
+
+    // 2) 드래그 시작: dragstart
+    document.addEventListener('dragstart', (e) => {
+      // 기물을 드래그할 때
+      if (e.target.classList.contains('piece')) {
+        draggedPiece = e.target;
+      }
+    });
+
+    // 3) 드래그 중(칸 위로 이동): dragover
+    document.addEventListener('dragover', (e) => {
+      // drop 가능하게 하려면 반드시 preventDefault() 필요
+      e.preventDefault();
+    });
+
+    // 4) 드롭: drop
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      // 드롭 위치가 '.square'이고, 드래그 중인 기물이 있으면
+      if (draggedPiece && e.target.classList.contains('square')) {
+        e.target.appendChild(draggedPiece);
+      }
+      draggedPiece = null;
+    });
+  </script>
+</body>
+</html>
